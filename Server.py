@@ -1,31 +1,46 @@
 # coding:utf-8
 import socket
 from  multiprocessing import Process
+import re
 
 
 def handle_client(client):
     """deal with the client request"""
-    # get request data from client
-    request = client.recv(1024)
-    print("request data: " + request.decode("utf-8"))
-    # construct respond data
-    response_start_line = "HTTP/1.1 200 OK\r\n"
-    response_headers = "Server: my server\r\n"
-    response_body = "hello kugou"
+    request_data = client.recv(1024)
+    request_lines = request_data.splitlines()
+    for line in request_lines:
+        print(line)
+    request_start_line = request_lines[0]
+    print(request_start_line.decode("utf-8"))
+    file_name = re.match(r"\w+ +(/[^ ]*) ", request_start_line.decode("utf-8")).group(1)
+    if file_name == "/":
+        file_name = "/index.html"
+    try:
+        print("file name: " + HTML_ROOT_DIR + file_name)
+        file = open(HTML_ROOT_DIR + file_name, "rb")
+    except IOError:
+        print("Error happens")
+        response_start_line = "HTTP/1.1 404 Not Found\r\n"
+        response_headers = "Server: my server\r\n"
+        response_body = "The file is not found"
+    else:
+        file_data = file.read()
+        file.close()
+        response_start_line = "HTTP/1.1 200 OK\r\n"
+        response_headers = "Server: my server\r\n"
+        response_body = file_data.decode("utf-8")
     response = response_start_line + response_headers + "\r\n" + response_body
-    print("response data:", response)
-    # send response data to client
+    print("response data: ", response)
     client.send(bytes(response, "utf-8"))
-    # close client
     client.close()
 
 
-HTML_ROOT_DIR = ""
+HTML_ROOT_DIR = "./html"
 
 
 def main():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server.bind(("", 8000))
     server.listen(128)
     while True:
