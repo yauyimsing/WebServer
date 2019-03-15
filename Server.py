@@ -2,6 +2,7 @@
 import socket
 from  multiprocessing import Process
 
+
 def handle_client(client):
     """deal with the client request"""
     # get request data from client
@@ -21,6 +22,7 @@ def handle_client(client):
 
 HTML_ROOT_DIR = ""
 
+
 def main():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -32,6 +34,7 @@ def main():
         p = Process(target=handle_client, args=(client,))
         p.start()
         client.close()
+
 
 if __name__ == "__main__":
     main()
