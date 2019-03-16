@@ -11,7 +11,9 @@ WSGI_PYTHON_DIR = "./wsgipython"
 
 class HTTPServer(object):
     """web server class"""
-    def __init__(self):
+    def __init__(self, application):
+        """construct function, application is from framework"""
+        self.app = application
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.response_headers = ""
@@ -50,41 +52,13 @@ class HTTPServer(object):
 
         file_name = re.match(r"\w+ +(/[^ ]*) ", request_start_line.decode("utf-8")).group(1)
         method = re.match(r"(\w+) +/[^ ]* ", request_start_line.decode("utf-8")).group(1)
-        # active service
-        if file_name.endswith(".py"):
-            try:
-                # execute python file
-                m = __import__(file_name[1:-3])
-            except Exception:
-                print("exception..." + file_name[1:-3])
-                self.response_headers = "HTTP/1.1 404 Not Found\r\n"
-                response_body = "not found"
-            else:
-                env = {
-                    "PATH_INFO" : file_name,
-                    "METHOD": method
-                }
-                response_body = m.application(env, self.start_response)
-            response = self.response_headers + "\r\n" + response_body
-        # static service
-        else:
-            if file_name == "/":
-                file_name = "/index.html"
-            try:
-                print("file name: " + HTML_ROOT_DIR + file_name)
-                file = open(HTML_ROOT_DIR + file_name, "rb")
-            except IOError:
-                print("Error happens")
-                response_start_line = "HTTP/1.1 404 Not Found\r\n"
-                response_headers = "Server: my server\r\n"
-                response_body = "The file is not found...ee"
-            else:
-                file_data = file.read()
-                file.close()
-                response_start_line = "HTTP/1.1 200 OK\r\n"
-                response_headers = "Server: my server\r\n"
-                response_body   = file_data.decode("utf-8")
-            response = response_start_line + response_headers + "\r\n" + response_body
+
+        env = {
+            "PATH_INFO" : file_name,
+            "METHOD": method
+        }
+        response_body = self.app(env, self.start_response)
+        response = self.response_headers + "\r\n" + response_body
         print("response data: ", response)
         client.send(bytes(response, "utf-8"))
         client.close()
@@ -97,7 +71,16 @@ def main():
     print("*"*10)
     print("*"*10)
     sys.path.insert(1, WSGI_PYTHON_DIR)
-    http_server = HTTPServer()
+
+    if len(sys.argv) < 2:
+        sys.exit("python FrameworkServer.py Module:app")
+    # python FrameworkServer.py FrameWork::app (start in shell with arguments)
+    module_name, app_name = sys.argv[1].split(":")
+    # module_name = "FrameWork"
+    # app_name = "app"
+    m = __import__(module_name)
+    app = getattr(m, app_name)
+    http_server = HTTPServer(app)
     http_server.bind(7777)
     http_server.start()
 
